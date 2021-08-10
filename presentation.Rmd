@@ -1,0 +1,131 @@
+---
+title: 'R Markdown: <br/> Presentation & Plotly'
+author: "Jieqian Liu"
+date: "Aug 9 2021"
+output:
+  slidy_presentation: default
+  ioslides_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(dplyr)
+library(plotly)
+```
+
+## Developing Data Products: Project 2
+
+This presentation was created as an assignment of Coursera's Developing Data Products course. The requirements for the assignment are: <br/> <br/>
+- The web page must feature a date and is this date less than two months before submission. <br />
+- The web page must be a presentation and must feature an interactive plot that appears to have been created with Plotly. <br/><br/>
+
+Here you can see an example of an acceptable assignment from the instructor: [Example](http://seankross.neocities.org/week3.html)
+
+## Introduction: UK Driver Deaths
+
+This presentation will examine the rate of driver deaths in the UK before and after the introduction of a law requiring seatbelts to be worn. Some notable findings are:<br/><br/>
+- The passing of the law is not obviously correlated with a drop in driver deaths. <br/>
+- Looking at only the data with the law passed, there is an *increase* in deaths. This is likely due to the small sample. <br/>
+- The increate of gas (petrol) prices, along with greater distances driven, are also correlated with a drop in driver deaths.
+
+## Data
+
+<font size="4">The data is a time series giving the monthly totals of car drivers in Great Britain killed or seriously injured Jan 1969 to Dec 1984. Compulsory wearing of seat belts was introduced on 31 Jan 1983.</font>
+
+```{r}
+data("Seatbelts")
+sb <- data.frame(Seatbelts)
+sb$date <- time(Seatbelts)
+sb$law <- gsub("1", "BeltsReq", sb$law)
+sb$law <- gsub("0", "BeltsNotReq", sb$law)
+sb$law <- as.factor(sb$law)
+```
+
+```{r, echo=F}
+summary(sb)
+```
+
+## Regressions
+
+<font size="4">Looking at the analysis of variance for the variables in the data set we can see that the enacting of the law does seem to have a significant effect, however this is likely due to the influence of the points, which are only at the end of the time-series data. The price of gas (petrol) also has a significant effect. Distance traveled, however, does not seem to.</font>
+
+```{r}
+fit1 <- lm(DriversKilled ~ date, sb)
+fit2 <- lm(DriversKilled ~ date + law, sb)
+fit3 <- lm(DriversKilled ~ date + law + PetrolPrice, sb)
+fit4 <- lm(DriversKilled ~ date + law + PetrolPrice + kms, sb)
+```
+
+```{r, warning=F}
+anova(fit1, fit2, fit3, fit4)
+```
+
+## Deaths vs Time
+
+<font size="4">Here we can see the pre- and post-law death counts. There is a clear downward trend over time, even without the law passed. It isn't clear from this data whether the law had an impact on death counts.</font>
+
+```{r}
+fit1 <- lm(DriversKilled ~ date, sb)
+```
+
+```{r, warning=F}
+p <- sb %>%
+  plot_ly(x=~date, y=~DriversKilled,
+          type="scatter", mode="lines", color=~law, name="Drivers Killed") %>% 
+  add_trace(x=~date, y = fitted(fit1), mode="lines", name="date")
+p
+```
+
+## Deaths vs Time (Law Passed)
+
+<font size="4">Looking at only the data with the law passed we can see an *increase* in deaths. The sample, however, is very small. If we had more years of data it seems likely that we'd see a decreasing trend.</font>
+
+
+```{r, warning=F}
+p <- subset(sb, law=="BeltsReq")[,-8] %>%
+  plot_ly(x=~date, y=~DriversKilled,
+          type="scatter", mode="lines", name="Drivers Killed") %>% 
+  add_trace(x=~date, y = fitted(lm(DriversKilled ~ date, subset(sb, law=="BeltsReq")[,-8])), mode="lines", name="Trend")
+p
+```
+
+## Deaths vs Gas Price
+
+<font size="4">There is a clear downward trend of fewer deaths with increasing gas prices.</font>
+
+```{r, warning=F}
+p <- sb %>%
+  plot_ly(x=~PetrolPrice, y=~DriversKilled,
+          type="scatter", mode="markers", name="Drivers Killed") %>% 
+  add_trace(x=~PetrolPrice, y =fitted(lm(DriversKilled ~ PetrolPrice, sb)), mode="lines", name="Trend")
+p
+```
+
+## Deaths vs Distance Driven
+
+<font size="4">There is a clear downward trend of fewer deaths with increasing distance driven. This is highly counter-intuitive, and suggests missing variables.</font>
+
+```{r, warning=F}
+p <- sb %>%
+  plot_ly(x=~kms, y=~DriversKilled,
+          type="scatter", mode="markers", name="Drivers Killed") %>% 
+  add_trace(x=~kms, y =fitted(lm(DriversKilled ~ kms, sb)), mode="lines", name="Trend")
+p
+```
+
+## Distance Driven vs Gas Price
+
+<font size="4">There is a clear upward trend of increasing gas prices as distances driven increase. This isn't surprising, as increased demand can be expected to lead to higher prices.</font>
+
+```{r, warning=F}
+p <- sb %>%
+  plot_ly(x=~PetrolPrice, y=~kms,
+          type="scatter", mode="markers", name="Gas Price") %>% 
+  add_trace(x=~PetrolPrice, y =fitted(lm(kms ~ PetrolPrice, sb)), mode="lines", name="Trend")
+p
+```
+
+## Conclusions
+
+This dataset seems to be much too small to draw any conclusions about the impact of seatbelt laws on driver deaths in the UK. Further, it seems likely that there are missing confounding variables. For example: deaths decrease with petrol price, but they also increase with distance driven, and there is likely a relationship between distance and price.
